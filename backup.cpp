@@ -1,8 +1,8 @@
 #include <iostream>
 #include <fstream>
 #include <stdlib.h>
+#include "md5.hpp"
 
-using namespace std;
 
 int main(int argc, char * argv[]) {
 
@@ -18,6 +18,8 @@ int main(int argc, char * argv[]) {
 		cerr << "File " << filename << " could not be opened.\n";
 		exit(1);
 	}
+
+	md5 m(infile);
 
 	infile.close();
 	
