@@ -6,10 +6,11 @@
 #include <vector>
 
 #define BLOCK 64
+#define BUFFER 1024
 
 using namespace std;
 
-struct Block { char block[BLOCK] = {0}; };
+//struct Block { unsigned char block[BLOCK] = {0}; };
 
 class md5 {
 
@@ -20,7 +21,15 @@ class md5 {
 		void init();
 //		vector<Block> readFile(ifstream&);
 		void readFile(ifstream& infile);
+		void readFile2(ifstream& infile);
+
+		void stateUpdate(const unsigned char * chunk);
+		void stateUpdate(const char chunk[]);
+
 	private:
+
+		int test;
+
 		static constexpr unsigned int S[64] = { 
 			7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,
 			5,  9, 14, 20,  5,  9, 14, 20,  5,  9, 14, 20,  5,  9, 14, 20,
@@ -44,6 +53,12 @@ class md5 {
 			0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
 			0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1,
 			0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391
+		};
+
+		const unsigned char padding[64] = {
+			128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			  0, 0, 0, 0, 0, 0, 0, 0
 		};
 
 		unsigned int a0; //A
