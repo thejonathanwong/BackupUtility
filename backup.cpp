@@ -20,6 +20,7 @@ int main(int argc, char * argv[]) {
 	}
 
 	md5 m(infile);
+	cout << m.toHex() << "\n";
 
 	infile.close();
 	

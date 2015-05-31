@@ -3,10 +3,12 @@
 
 #include <fstream>
 #include <string>
-#include <vector>
+//#include <vector>
+#include <cstdint>
 
 #define BLOCK 64
 #define BUFFER 1024
+#define BITS 8
 
 using namespace std;
 
@@ -23,20 +25,23 @@ class md5 {
 		void readFile(ifstream& infile);
 		void readFile2(ifstream& infile);
 
-		void stateUpdate(const unsigned char * chunk);
-		void stateUpdate(const char chunk[]);
+		unsigned int inline leftRotate(unsigned int x, unsigned int c);
 
+		void stateUpdate(const unsigned char * chunk, size_t length);
+		void stateUpdate(const char chunk[], size_t length);
+
+		string toHex();
 	private:
 
-		int test;
+		unsigned char hash[16] = {0};
 
-		static constexpr unsigned int S[64] = { 
+		const unsigned int S[64] = { 
 			7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,
 			5,  9, 14, 20,  5,  9, 14, 20,  5,  9, 14, 20,  5,  9, 14, 20,
 			4, 11, 16, 23,  4, 11, 16, 23,  4, 11, 16, 23,  4, 11, 16, 23,
 			6, 10, 15, 21,  6, 10, 15, 21,  6, 10, 15, 21,  6, 10, 15, 21 
 		};
-		static constexpr unsigned int K[64] = {
+		const unsigned int K[64] = {
 			0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee,		
 			0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,	
 			0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be,
@@ -61,10 +66,10 @@ class md5 {
 			  0, 0, 0, 0, 0, 0, 0, 0
 		};
 
-		unsigned int a0; //A
-		unsigned int b0; //B
-		unsigned int c0; //C
-		unsigned int d0; //D	
+		uint32_t a0; //A
+		uint32_t b0; //B
+		uint32_t c0; //C
+		uint32_t d0; //D	
 
 };
 
