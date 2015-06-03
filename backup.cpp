@@ -19,8 +19,12 @@ int main(int argc, char * argv[]) {
 		exit(1);
 	}
 
-	md5 m(infile);
-	cout << m.toHex() << "\n";
+//	md5 m(infile);
+//	cout << m.toHex() << "\n";
+
+	md5 mm("grape");
+	cout << "md5 of \"grape\": " << mm.toHex() << "\n";
+
 
 	infile.close();
 	

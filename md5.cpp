@@ -12,12 +12,64 @@ md5::md5(ifstream& infile) {
 	readFile(infile);
 }
 
+md5::md5(const string& s) {
+	init();
+	readString(s);
+}
+
 void md5::init() {
 	//Initialize variables:
 	a0 = 0x67452301;
 	b0 = 0xefcdab89;
 	c0 = 0x98badcfe;
 	d0 = 0x10325476;
+
+	totalBits = 0;
+}
+
+void md5::encodeBits(unsigned char * chunk, size_t length) {
+	unsigned char bits[BITS]= {0};
+	for(unsigned int i = 0; i < BITS; ++i) {
+//		chunk[length - BITS] = (totalBits >> 8*i) & 0xff;
+		bits[i] = (totalBits >> 8*i) & 0xff;
+	}
+	memcpy(&chunk[length-BITS], bits, BITS);
+	for(int i = 0; i < 8; ++i) {
+		for(int j = 0; j < 8; ++j) {
+			std::cout << ((chunk[length-BITS+i] >> j) & 1);
+		}
+	}
+	std::cout << "\n";
+}
+
+void md5::readString(string s) {
+	unsigned int buffersize;
+	unsigned int length = s.length();
+	unsigned int index = length % BLOCK;
+
+	totalBits = length << 3;
+
+
+	unsigned int padLen;
+	if(index < 56) {
+		padLen = 56 - index;
+		buffersize = BLOCK * (length/BLOCK + 1);
+	} else {
+		padLen = 120 - index;
+		buffersize = BLOCK * (length/BLOCK + 2);
+	}
+		
+	unsigned char chunk[buffersize] = {0};
+
+	cout << "buffersize: " <<  buffersize << "\n";
+
+
+	memcpy(chunk, s.c_str(), length);
+	memcpy(&chunk[length], padding, padLen);
+	encodeBits(chunk, buffersize);
+
+	stateUpdate(chunk, buffersize);
+
 }
 
 void md5::readFile(ifstream& infile) {
@@ -37,13 +89,22 @@ void md5::readFile(ifstream& infile) {
 			stateUpdate(chunk, bytesRead);
 //			cout << bytesRead << "\n";
 		} else { //handles the last chunk of a file
+			totalBits = (totalBytes << 3); //file size in bits
 
-			//calculates the total number of bits of the file
-			unsigned char bits[BITS];
-			unsigned long long totalBits = (totalBytes << 3); //file size in bits
-			for(unsigned int i = 0; i < BITS; ++i) {
-				bits[i] = (totalBits >> 8*i) & 0xff;
-			}
+//			//calculates the total number of bits of the file
+//			unsigned char bits[BITS];
+////			unsigned long long totalBits = (totalBytes << 3); //file size in bits
+//			totalBits = (totalBytes << 3); //file size in bits
+//			for(unsigned int i = 0; i < BITS; ++i) {
+//				bits[i] = (totalBits >> 8*i) & 0xff;
+//			}
+//
+//	for(int i = 0; i < 8; ++i) {
+//		for(int j = 0; j < 8; ++j) {
+//			std::cout << ((bits[i] >> j) & 1);
+//		}
+//	}
+//	std::cout << "\n";
 
 			unsigned int index = bytesRead % BLOCK;
 			unsigned int padLen;
@@ -56,10 +117,11 @@ void md5::readFile(ifstream& infile) {
 				//appends 1 and pads withs 0s, then
 				//inserts file size in bits as last 64 bits of message
 				memcpy(&chunk[bytesRead], padding, padLen);
-				memcpy(&chunk[bytesRead + padLen], bits, BITS);
+//				memcpy(&chunk[bytesRead + padLen], bits, BITS);
+				encodeBits((unsigned char *) chunk, bytesRead+padLen+BITS);
 				stateUpdate(chunk, bytesRead + padLen + BITS);
 
-//				cout << bytesRead + padLen + BITS << "\n";
+				cout << bytesRead + padLen + BITS << "\n";
 
 			} else { //if padding will overfill the BUFFER, overflow buffer is necessary
 
@@ -73,7 +135,8 @@ void md5::readFile(ifstream& infile) {
 				}
 				
 				//sets last 64 bits / 8 bytes of overflow
-				memcpy(&overflow[BLOCK - 8], bits, BITS);
+//				memcpy(&overflow[BLOCK - 8], bits, BITS);
+				encodeBits((unsigned char *) chunk, bytesRead+padLen+BITS);
 
 				stateUpdate(chunk, BUFFER);
 				stateUpdate(overflow, BLOCK);
@@ -99,6 +162,7 @@ void md5::readFile(ifstream& infile) {
 void md5::stateUpdate(const unsigned char * chunk, size_t length) {
 	if((length % BLOCK) != 0) {
 		cerr << "stateUpdate: buffer length not multiple of 512 bits\n";
+		cerr << length;
 		exit(1);
 	} 
 
@@ -106,6 +170,15 @@ void md5::stateUpdate(const unsigned char * chunk, size_t length) {
 
 	//for each 512 bit chunk of the message, loop
 	for(size_t i = 0; i < iterations; ++i) {
+		uint32_t M[16];
+		uint32_t z = 0;
+		for(uint32_t index = 0; index < 16; ++index) {
+			M[index] = ((uint32_t) chunk[i*BLOCK + z]) | (((uint32_t)chunk[i*BLOCK+z+1]) << 8) |
+				 (((uint32_t)chunk[i*BLOCK+z+2]) << 16) | (((uint32_t)chunk[i*BLOCK+z+3]) << 24);
+			z += 4;
+		}
+		cout << "\n";
+
 		uint32_t A = a0;
 		uint32_t B = b0;
 		uint32_t C = c0;
@@ -120,52 +193,75 @@ void md5::stateUpdate(const unsigned char * chunk, size_t length) {
 			
 			if ( j < 16  ) {
 				F = (B & C) | ((~B) & D);
-				g = i;
+				g = j;
 
 			} else if ( j < 32) {
 				F = (D & B) | ((~D) & C);
-				g = (5*i + 1) % 16;
+				g = (5*j + 1) % 16;
 
 			} else if ( j < 48 ) {
 				F = B ^ C ^ D;
-				g = (3*i + 5) % 16;
+				g = (3*j + 5) % 16;
 				
 			} else if (j < 64) {
 				F = C ^ (B | (~D));
-				g = (7*i) % 16;
+				g = (7*j) % 16;
 			}
+//				cout << M[g] << endl;
 			dTemp = D;
 			D = C;
 			C = B;
-			B = B + leftRotate( (A + F + K[j] + chunk[i*BLOCK + g]), S[j]);
+//			B = B + leftRotate( (A + F + K[j] + chunk[i*BLOCK + g]), S[j]);
+			B = B + leftRotate( (A + F + K[j] + M[g]), S[j]);
 			A = dTemp;
 		}
 		a0 += A;
 		b0 += B;
 		c0 += C;
 		d0 += D;
+
+		cout << a0 << " " << b0 << " " << c0 << " " << d0 << "\n";
 		
 	}
-	hash[0] = (a0 >> 24) & 0xff;
-	hash[1] = (a0 >> 16) & 0xff;
-	hash[2] = (a0 >> 8) & 0xff;
-	hash[3] = (a0) & 0xff;
+//	hash[0] = (a0 >> 24) & 0xff;
+//	hash[1] = (a0 >> 16) & 0xff;
+//	hash[2] = (a0 >> 8) & 0xff;
+//	hash[3] = (a0) & 0xff;
+//
+//	hash[4] = (b0 >> 24) & 0xff;
+//	hash[5] = (b0 >> 16) & 0xff;
+//	hash[6] = (b0 >> 8) & 0xff;
+//	hash[7] = (b0) & 0xff;
+//
+//	hash[8]  = (c0 >> 24) & 0xff;
+//	hash[9]  = (c0 >> 16) & 0xff;
+//	hash[10] = (c0 >> 8) & 0xff;
+//	hash[11] = (c0) & 0xff;
+//
+//	hash[12] = (d0 >> 24) & 0xff;
+//	hash[13] = (d0 >> 16) & 0xff;
+//	hash[14] = (d0 >> 8) & 0xff;
+//	hash[15] = (d0) & 0xff;
 
-	hash[4] = (b0 >> 24) & 0xff;
-	hash[5] = (b0 >> 16) & 0xff;
-	hash[6] = (b0 >> 8) & 0xff;
-	hash[7] = (b0) & 0xff;
+	hash[0] = (a0 ) & 0xff;
+	hash[1] = (a0 >> 8) & 0xff;
+	hash[2] = (a0 >> 16) & 0xff;
+	hash[3] = (a0 >> 24) & 0xff;
 
-	hash[8]  = (c0 >> 24) & 0xff;
-	hash[9]  = (c0 >> 16) & 0xff;
-	hash[10] = (c0 >> 8) & 0xff;
-	hash[11] = (c0) & 0xff;
+	hash[4] = (b0) & 0xff;
+	hash[5] = (b0 >> 8) & 0xff;
+	hash[6] = (b0 >> 16) & 0xff;
+	hash[7] = (b0 >> 24) & 0xff;
 
-	hash[12] = (d0 >> 24) & 0xff;
-	hash[13] = (d0 >> 16) & 0xff;
-	hash[14] = (d0 >> 8) & 0xff;
-	hash[15] = (d0) & 0xff;
+	hash[8]  = (c0) & 0xff;
+	hash[9]  = (c0 >> 8) & 0xff;
+	hash[10] = (c0 >> 16) & 0xff;
+	hash[11] = (c0 >> 24) & 0xff;
 
+	hash[12] = (d0) & 0xff;
+	hash[13] = (d0 >> 8) & 0xff;
+	hash[14] = (d0 >> 16) & 0xff;
+	hash[15] = (d0 >> 24) & 0xff;
 	/*
     for i from 0 to 63
         if 0 ≤ i ≤ 15 then

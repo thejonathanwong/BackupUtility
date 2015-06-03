@@ -4,6 +4,8 @@
 #include <fstream>
 #include <string>
 //#include <vector>
+#include <cstring>
+#include <iostream>
 #include <cstdint>
 
 #define BLOCK 64
@@ -19,16 +21,20 @@ class md5 {
 	public:
 		md5();
 		md5(ifstream&);
+		md5(const string& s);
 
 		void init();
 //		vector<Block> readFile(ifstream&);
 		void readFile(ifstream& infile);
 		void readFile2(ifstream& infile);
+		void readString(string s);
 
 		unsigned int inline leftRotate(unsigned int x, unsigned int c);
 
 		void stateUpdate(const unsigned char * chunk, size_t length);
 		void stateUpdate(const char chunk[], size_t length);
+
+		void encodeBits(unsigned char * chunk, size_t length);
 
 		string toHex();
 	private:
@@ -70,6 +76,8 @@ class md5 {
 		uint32_t b0; //B
 		uint32_t c0; //C
 		uint32_t d0; //D	
+
+		uint64_t totalBits;
 
 };
 
