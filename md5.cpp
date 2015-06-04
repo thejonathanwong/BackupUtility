@@ -27,6 +27,16 @@ void md5::init() {
 	totalBits = 0;
 }
 
+void md5::hash(ifstream& infile) {
+	md5::init();
+	md5::readFile(infile);
+}
+
+void md5::hash(string s) {
+	md5::init();
+	md5::readString(s);
+}
+
 void md5::encodeBits(unsigned char * chunk, size_t length) {
 	unsigned char bits[BITS]= {0};
 	for(unsigned int i = 0; i < BITS; ++i) {
@@ -34,12 +44,12 @@ void md5::encodeBits(unsigned char * chunk, size_t length) {
 		bits[i] = (totalBits >> 8*i) & 0xff;
 	}
 	memcpy(&chunk[length-BITS], bits, BITS);
-	for(int i = 0; i < 8; ++i) {
-		for(int j = 0; j < 8; ++j) {
-			std::cout << ((chunk[length-BITS+i] >> j) & 1);
-		}
-	}
-	std::cout << "\n";
+//	for(int i = 0; i < 8; ++i) {
+//		for(int j = 0; j < 8; ++j) {
+//			std::cout << ((chunk[length-BITS+i] >> j) & 1);
+//		}
+//	}
+//	std::cout << "\n";
 }
 
 void md5::readString(string s) {
@@ -61,7 +71,7 @@ void md5::readString(string s) {
 		
 	unsigned char chunk[buffersize] = {0};
 
-	cout << "buffersize: " <<  buffersize << "\n";
+//	cout << "buffersize: " <<  buffersize << "\n";
 
 
 	memcpy(chunk, s.c_str(), length);
@@ -121,7 +131,7 @@ void md5::readFile(ifstream& infile) {
 				encodeBits((unsigned char *) chunk, bytesRead+padLen+BITS);
 				stateUpdate(chunk, bytesRead + padLen + BITS);
 
-				cout << bytesRead + padLen + BITS << "\n";
+//				cout << bytesRead + padLen + BITS << "\n";
 
 			} else { //if padding will overfill the BUFFER, overflow buffer is necessary
 
@@ -156,7 +166,7 @@ void md5::readFile(ifstream& infile) {
 			}
 		}
 	}
-	cout << "totalBytes = " << totalBytes << "\n";
+//	cout << "totalBytes = " << totalBytes << "\n";
 }
 
 void md5::stateUpdate(const unsigned char * chunk, size_t length) {
@@ -177,7 +187,7 @@ void md5::stateUpdate(const unsigned char * chunk, size_t length) {
 				 (((uint32_t)chunk[i*BLOCK+z+2]) << 16) | (((uint32_t)chunk[i*BLOCK+z+3]) << 24);
 			z += 4;
 		}
-		cout << "\n";
+//		cout << "\n";
 
 		uint32_t A = a0;
 		uint32_t B = b0;
@@ -220,7 +230,7 @@ void md5::stateUpdate(const unsigned char * chunk, size_t length) {
 		c0 += C;
 		d0 += D;
 
-		cout << a0 << " " << b0 << " " << c0 << " " << d0 << "\n";
+//		cout << a0 << " " << b0 << " " << c0 << " " << d0 << "\n";
 		
 	}
 //	hash[0] = (a0 >> 24) & 0xff;
@@ -243,25 +253,25 @@ void md5::stateUpdate(const unsigned char * chunk, size_t length) {
 //	hash[14] = (d0 >> 8) & 0xff;
 //	hash[15] = (d0) & 0xff;
 
-	hash[0] = (a0 ) & 0xff;
-	hash[1] = (a0 >> 8) & 0xff;
-	hash[2] = (a0 >> 16) & 0xff;
-	hash[3] = (a0 >> 24) & 0xff;
+	hashed[0] = (a0 ) & 0xff;
+	hashed[1] = (a0 >> 8) & 0xff;
+	hashed[2] = (a0 >> 16) & 0xff;
+	hashed[3] = (a0 >> 24) & 0xff;
 
-	hash[4] = (b0) & 0xff;
-	hash[5] = (b0 >> 8) & 0xff;
-	hash[6] = (b0 >> 16) & 0xff;
-	hash[7] = (b0 >> 24) & 0xff;
+	hashed[4] = (b0) & 0xff;
+	hashed[5] = (b0 >> 8) & 0xff;
+	hashed[6] = (b0 >> 16) & 0xff;
+	hashed[7] = (b0 >> 24) & 0xff;
 
-	hash[8]  = (c0) & 0xff;
-	hash[9]  = (c0 >> 8) & 0xff;
-	hash[10] = (c0 >> 16) & 0xff;
-	hash[11] = (c0 >> 24) & 0xff;
+	hashed[8]  = (c0) & 0xff;
+	hashed[9]  = (c0 >> 8) & 0xff;
+	hashed[10] = (c0 >> 16) & 0xff;
+	hashed[11] = (c0 >> 24) & 0xff;
 
-	hash[12] = (d0) & 0xff;
-	hash[13] = (d0 >> 8) & 0xff;
-	hash[14] = (d0 >> 16) & 0xff;
-	hash[15] = (d0 >> 24) & 0xff;
+	hashed[12] = (d0) & 0xff;
+	hashed[13] = (d0 >> 8) & 0xff;
+	hashed[14] = (d0 >> 16) & 0xff;
+	hashed[15] = (d0 >> 24) & 0xff;
 	/*
     for i from 0 to 63
         if 0 ≤ i ≤ 15 then
@@ -294,7 +304,7 @@ string md5::toHex() {
   char buf[33];
 
   for (int i=0; i<16; i++) {
-    sprintf(buf+i*2, "%02x", hash[i]);
+    sprintf(buf+i*2, "%02x", hashed[i]);
   }
 
   buf[32]=0;
@@ -310,113 +320,7 @@ unsigned int inline md5::leftRotate(unsigned int x, unsigned int c) {
 	return ((x << c) | (x >> (32-c)));
 }
 
-//vector<Block> md5::readFile(ifstream& infile) {
-void md5::readFile2(ifstream& infile) {
-//	vector<Block> v;
 
-//	Block b;
-	char chunk[BUFFER] = {0};
-	char overflow[BLOCK] = {0};
-	bool overfilled = false;
-	unsigned long long totalBytes = 0;
-	unsigned int bRead = 0;
-	while (infile) {
-//		memset(b.block, 0, sizeof(b.block));
-//		infile.read(b.block, BLOCK);
-//		v.push_back(b);
-		memset(chunk, 0, sizeof(chunk));
-		infile.read(chunk, BUFFER);
-
-		bRead = infile.gcount();
-		totalBytes += bRead;
-
-		//handles the last chunk
-//		if(bRead != BUFFER) {
-		if(!infile){
-//			unsigned int padLen = (length < 56) ? 56 - length : 120 - length; 
-
-			//calculates the total number of bits of the file
-			unsigned char bits[8];
-			unsigned long long totalBits = totalBytes << 3;
-			for(unsigned int i = 0; i < BITS; ++i) {
-				bits[i] = (totalBits >> 8*i) & 0xff;
-				//					for(int j = 0; j < 8; ++j) {
-				//						cout << ((bits[i] >> j) &1);
-				//					}
-			}
-			//				cout << "\n";
-
-
-			//handles padding
-			unsigned int padLen;
-			unsigned int length = (bRead % BLOCK);
-			if( (bRead != 0) && (bRead < (BUFFER - BLOCK - 8)) ) { //if padding will not cause buffer to overflow
-
-				padLen = (length < 56) ? (56 - length) : (120 - length);
-
-				memcpy(&chunk[bRead], padding, padLen);
-				memcpy(&chunk[bRead + padLen], bits, BITS);
-
-			} else { //if padding will go beyond the chunk's buffer size of BLOCK originally 1024
-				cout << "hello\n";
-				if (length < 56) {
-
-					//appends 1 and pads with 0s
-					padLen = 56 - length;
-					memcpy(&chunk[bRead], padding, padLen);
-
-					//sets last 8 bytes / 64 bits to file size 
-					memcpy(&chunk[bRead + padLen], bits, BITS);
-
-				} else { //overflow buffer is needed 
-
-
-					if ( length < 64 ) { // fills in padding for chunk if needed
-
-						padLen = 64 - length;
-						memcpy(&chunk[bRead], padding, padLen);
-
-					} else { // sets first bit of overflow to 1 since chunk is filled by the file
-						memcpy(overflow, padding, sizeof(padding));
-					}
-
-					//sets last 8 bytes to file size
-					memcpy(&overflow[BLOCK - BITS], bits, BITS);
-					overfilled = true;
-				}
-			}
-		}
-
-		stateUpdate(chunk, bRead);
-	}
-
-	if (overfilled) {
-		cout << "overfilled\n";
-		stateUpdate(overflow, BLOCK);
-	}
-
-
-	cout << totalBytes << "\n";
-	cout << sizeof(unsigned long long) << "\n";
-
-	//	for( Block bb : v ) {
-	//		cout << bb.block << "\n";
-	//	}
-
-	//modify last 64 byte chunk
-	//	b = v.back();
-	//
-	//
-	//
-	//	for(Block chunk : v) {
-	//		
-	//	}
-
-
-	//	return v;
-
-
-}
 
 
 

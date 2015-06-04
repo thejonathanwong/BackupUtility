@@ -24,10 +24,10 @@ class md5 {
 		md5(const string& s);
 
 		void init();
-//		vector<Block> readFile(ifstream&);
 		void readFile(ifstream& infile);
-		void readFile2(ifstream& infile);
 		void readString(string s);
+		void hash(ifstream& infile);
+		void hash(string s);
 
 		unsigned int inline leftRotate(unsigned int x, unsigned int c);
 
@@ -39,7 +39,6 @@ class md5 {
 		string toHex();
 	private:
 
-		unsigned char hash[16] = {0};
 
 		const unsigned int S[64] = { 
 			7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,
@@ -78,6 +77,7 @@ class md5 {
 		uint32_t d0; //D	
 
 		uint64_t totalBits;
+		uint8_t hashed[16] = {0};
 
 };
 
