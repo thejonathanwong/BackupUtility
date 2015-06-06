@@ -1,6 +1,9 @@
 #include "md5.hpp"
 #include <unistd.h>
 
+constexpr unsigned int md5::S[];
+constexpr unsigned int md5::K[];
+constexpr unsigned char md5::padding[64];
 
 md5::md5() {
 	init();
