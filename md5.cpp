@@ -1,6 +1,5 @@
 #include "md5.hpp"
-#include <cstring>
-#include <iostream>
+#include <unistd.h>
 
 
 md5::md5() {
@@ -28,6 +27,11 @@ void md5::init() {
 }
 
 void md5::hash(ifstream& infile) {
+	md5::init();
+	md5::readFile(infile);
+}
+
+void md5::hash(int infile) {
 	md5::init();
 	md5::readFile(infile);
 }
@@ -167,6 +171,65 @@ void md5::readFile(ifstream& infile) {
 		}
 	}
 //	cout << "totalBytes = " << totalBytes << "\n";
+}
+
+void md5::readFile(int infile) {
+	
+	char chunk[BUFFER] = {0};
+	
+	unsigned long long totalBytes = 0;
+	unsigned int bytesRead = 0;
+
+//	while (infile) {
+//		infile.read(chunk, BUFFER);
+//	while( !feof(infile) ) {
+//		bytesRead = fread(chunk, 1, BUFFER, infile);
+	while((bytesRead = read(infile, chunk, BUFFER)) > 0) {
+
+//		bytesRead = infile.gcount();
+		totalBytes += bytesRead;
+
+		if(bytesRead == BUFFER) { //if there are still things to be read
+			stateUpdate(chunk, bytesRead);
+		} else { //handles the last chunk of a file
+			totalBits = (totalBytes << 3); //file size in bits
+
+			unsigned int index = bytesRead % BLOCK;
+			unsigned int padLen;
+			char overflow[BLOCK] = {0};
+
+			//handles padding
+			if(bytesRead < BUFFER - 8){ //if padding will not overfill the BUFFER
+				padLen = (index < 56) ? (56 - index) : (120 - index);
+
+				//appends 1 and pads withs 0s, then
+				//inserts file size in bits as last 64 bits of message
+				memcpy(&chunk[bytesRead], padding, padLen);
+				encodeBits((unsigned char *) chunk, bytesRead+padLen+BITS);
+				stateUpdate(chunk, bytesRead + padLen + BITS);
+
+
+			} else { //if padding will overfill the BUFFER, overflow buffer is necessary
+
+				padLen = (index < 64) ? (64 - index) : (120 - index);
+				if ( padLen < 8 ) {
+
+					//if there is space in the chunks BUFFER, put padding there.
+					memcpy(&chunk[bytesRead], padding, padLen);
+				} else {
+					memcpy(overflow, padding, padLen);
+				}
+				
+				//sets last 64 bits / 8 bytes of overflow
+				encodeBits((unsigned char *) chunk, bytesRead+padLen+BITS);
+
+				stateUpdate(chunk, BUFFER);
+				stateUpdate(overflow, BLOCK);
+
+			}
+		}
+	}
+	
 }
 
 void md5::stateUpdate(const unsigned char * chunk, size_t length) {

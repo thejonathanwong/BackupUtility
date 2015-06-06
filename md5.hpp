@@ -24,9 +24,13 @@ class md5 {
 		md5(const string& s);
 
 		void init();
+
 		void readFile(ifstream& infile);
+		void readFile(int infile);
 		void readString(string s);
+
 		void hash(ifstream& infile);
+		void hash(int infile);
 		void hash(string s);
 
 		unsigned int inline leftRotate(unsigned int x, unsigned int c);
