@@ -26,8 +26,11 @@ class backup {
 		bool scanDirectory(int tarFD);
 		bool scanDirectory(DIR * dir);
 
+		bool handleDir(int& indir);
+
 		bool handleFile(int& infile);
-		void copyFile(int& infile, string& destString);
+		bool handleFile(int& infile, string& destString);
+		bool copyFile(int& infile, string& destString);
 
 		bool recCopyDir(path inDir, path target);
 	

@@ -86,10 +86,72 @@ void backup::run(char * inName, char * tarName, bool ow) {
 
 }
 
+bool backup::handleDir(int& indir, string& currDir, string& targetDir ) {
+	DIR * dir;
+	if(NULL == (dir = fdopendir(indir))) {
+		cerr << "Cannot open directory " << targetString;
+		return false;
+	}	
+
+	//loops through file in directory
+	struct stat currStat;
+	struct dirent * file;
+	int currFD;
+	vector<char *> 
+	while((file = readdir(dir))) {
+		string filename {file->d_name};
+		if(filename.compare(".") == 0) 
+			continue;
+		if(filename.compare("..") == 0) 
+			continue;
+
+		//opens file descriptor of the current file
+		if ( (currFD = open(file->d_name, O_RDONLY, 0)) < 0) {
+			cerr << "Unable to open " << filename << " to read\n";
+			break;
+		}
+
+		
+		//determines what is the current file descriptor
+		if(fstat(currFD, &currStat) == 0) {
+			if( (currStat.st_mode & S_IFREG) ){
+				//is a regular file
+				handleFile(currFD, targetDir + "/" + filename);
+			} else if ( (currStat.st_mode * S_IFDIR) ) {
+				//is a directory
+				handleDir(currFD, currDir + "/" + filename, targetDir + "/" + filename);
+			}
+		} else { 
+			cerr << "Could not fstat " << filename << "\n";
+		}
+
+
+		close(currFD);
+	}
+
+	closedir(dir);
+	return true;
+}
+
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  handleFile
+ *  Description:  Manages what to do with backing up a single file.
+ * 
+ * 				  @param: infile input file descriptor of the file to be backed up
+ * 			
+ * 				  @return: true if file was handled, false if error in copying
+ * =====================================================================================
+ */
 bool backup::handleFile(int& infile) {
 	//string of path to destination file
 	string destString = targetString + "/" + inputString;
 
+	return handleFile(infile, destString);
+}
+
+bool backup::handleFile(int& infile, string& destString) {
+	
 	//if file is not in the hashset, then write the file to the output directory
 	if(filesFound.find(inputString) == filesFound.end()) {
 		cout << "file not found\n";
@@ -97,10 +159,10 @@ bool backup::handleFile(int& infile) {
 
 
 
-		copyFile(infile, destString);
+		return copyFile(infile, destString);
 
 
-	} else {
+	} else if(overwrite){
 		cout << "file found\n";
 		//file is found so check hash
 		//hashes input file
@@ -109,45 +171,71 @@ bool backup::handleFile(int& infile) {
 		//if hash of input file does not match the hash of the file in the target directory
 		if(filesFound[inputString] != hasher.toHex()) {
 			cout << "hash does not match\n";
-			copyFile(infile, destString);
+			return copyFile(infile, destString);
 		}
 	}	
 	return true;
 }
 
-void backup::copyFile(int& infile, string& destString) {
-		//resets error flag and moves pointer to start of the file
-		lseek(infile, 0, SEEK_SET);
 
-		int flags = O_WRONLY | O_CREAT;
-		if(overwrite) {
-			flags |= O_TRUNC;
-		}
-		//opens and writes to destination file
-		int dest;
-		if( (dest = open(destString.c_str(), flags, 0644)) > 0) {
-			
-			char buffer[BUFFER];
-			size_t size;
-			while( (size = read(infile, buffer, BUFFER)) > 0 ) {
-				write(dest, buffer, size);
-			}
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  copyFile
+ *  Description:  Copies contents of a file descriptor to a target destination directory. Assumes
+ *  			  input is a file, and not a directory/symlink/other.
+ * 				  
+ * 				  TODO: error handling on the write
+ * 
+ * 				  @param: infile file descriptor of the input
+ * 				  @param: destString destination of where the file is to be copied to
+ * 				  
+ * 				  @return: true if destination was opened, false otherwise
+ * =====================================================================================
+ */
+bool backup::copyFile(int& infile, string& destString) {
+	//resets error flag and moves pointer to start of the file
+	lseek(infile, 0, SEEK_SET);
 
-//
-//			//uses Linux kernel to copy the file so NOT PORTABLE TO OTHER OS
-//			//TODO: possibly switch to boost filesystem copy_file, but potentially slower but portable?
-////			if(sendfile(dest, fd, 0, statBuffer.st_size) != statBuffer.st_size) {
-////				fprintf(stderr, "Did not copy %s correctly\n", pathC);
-////			}
-//
-			close(dest);
-		} else {
-			cerr << "Unable to open destination file " << destString << "\n";
-//			fprintf(stderr, "Unable to open destination file %s\n", pathC);
+	int flags = O_WRONLY | O_CREAT | O_TRUNC;
+//	if(overwrite) {
+//		flags |= O_TRUNC;
+//	}
+	//opens and writes to destination file
+	int dest;
+	if( (dest = open(destString.c_str(), flags, 0644)) > 0) {
+
+		char buffer[BUFFER];
+		size_t size;
+		while( (size = read(infile, buffer, BUFFER)) > 0 ) {
+			write(dest, buffer, size);
 		}
+
+		//
+		//			//uses Linux kernel to copy the file so NOT PORTABLE TO OTHER OS
+		//			//TODO: possibly switch to boost filesystem copy_file, but potentially slower but portable?
+		////			if(sendfile(dest, fd, 0, statBuffer.st_size) != statBuffer.st_size) {
+		////				fprintf(stderr, "Did not copy %s correctly\n", pathC);
+		////			}
+		//
+		close(dest);
+	} else {
+		cerr << "Unable to open destination file " << destString << "\n";
+		return false;
+	}
+	return true;
 }
 
 
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  scanDirectory
+ *  Description:  Helper function to scanDirectory. Opens DIR * from file descriptor.
+ *
+ * 				  @param: tarFD file descriptor of input to be converted to DIR *
+ * 		
+ * 				  @return: true if directory was opened, false otherwise
+ * =====================================================================================
+ */
 bool backup::scanDirectory(int tarFD) {
 	
 	DIR * dir;
@@ -155,8 +243,12 @@ bool backup::scanDirectory(int tarFD) {
 		cerr << "Cannot open directory " << targetString;
 		return false;
 	}
+	bool output = scanDirectory(dir);
+
+	//closes the output directory
+	closedir(dir);
 	
-	return scanDirectory(dir);
+	return output;
 }
 
 /* 
@@ -167,7 +259,7 @@ bool backup::scanDirectory(int tarFD) {
  *	
  * 				  @param: dirname is the name of the target directory to be scanned.
  *
- * 				  @return: returns true if the directory was opened, false otherwise.
+ * 				  @return: true if the directory was opened, false otherwise.
  * =====================================================================================
  */
 //bool backup::scanDirectory(char * dirname) {
@@ -181,13 +273,16 @@ bool backup::scanDirectory(DIR * dir) {
 	//loop to add hashes of the files in the output directory to the hashset
 	struct dirent * file;
 	while((file = readdir(dir))) {
-		if(strcmp(file->d_name, ".") == 0) 
+		string filename {file->d_name};
+
+//		if(strcmp(file->d_name, ".") == 0) 
+		if(filename.compare(".") == 0) 
 			continue;
-		if(strcmp(file->d_name, "..") == 0) 
+		if(filename.compare("..") == 0) 
+//		if(strcmp(file->d_name, "..") == 0) 
 			continue;
 
 		//path of the file found including the directory path
-		string filename {file->d_name};
 //		string fullPath {dirPath + "/" + filename}
 		path filePath = dirPath / filename;
 
@@ -211,8 +306,6 @@ bool backup::scanDirectory(DIR * dir) {
 		}
 	}
 
-	//closes the output directory
-	closedir(dir);
 
 
 	
