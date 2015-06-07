@@ -19,7 +19,7 @@ $(OBJ): backup.cpp backup.hpp md5.cpp md5.hpp
 
 .PHONY: clean
 clean:
-	rm -f $(OBJ) $(EXE)
+	rm -f $(OBJ) $(EXE) 
 
 .PHONY: all
-all: clean default
+all: clean default 

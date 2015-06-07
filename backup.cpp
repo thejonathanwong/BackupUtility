@@ -7,6 +7,7 @@
 #include <sys/sendfile.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
 //#include <unordered_set>
 //#include <unordered_map>
 #include "backup.hpp"
@@ -73,6 +74,8 @@ void backup::run(char * inName, char * tarName, bool ow) {
 
 		} else if ( statBuffer.st_mode & S_IFDIR ) {
 			//input is a directory
+			cout << "Input is a directory\n";
+			handleDir(inFD, inputString, targetString);
 
 		} else {
 			//input is symlink or other
@@ -86,48 +89,69 @@ void backup::run(char * inName, char * tarName, bool ow) {
 
 }
 
-bool backup::handleDir(int& indir, string& currDir, string& targetDir ) {
+bool backup::handleDir(int& indir, string currDir, string targetDir ) {
 	DIR * dir;
 	if(NULL == (dir = fdopendir(indir))) {
 		cerr << "Cannot open directory " << targetString;
 		return false;
 	}	
 
-	//loops through file in directory
-	struct stat currStat;
-	struct dirent * file;
-	int currFD;
-	vector<char *> 
-	while((file = readdir(dir))) {
-		string filename {file->d_name};
-		if(filename.compare(".") == 0) 
-			continue;
-		if(filename.compare("..") == 0) 
-			continue;
+	targetDir += "/" + currDir;
 
-		//opens file descriptor of the current file
-		if ( (currFD = open(file->d_name, O_RDONLY, 0)) < 0) {
-			cerr << "Unable to open " << filename << " to read\n";
-			break;
-		}
-
+	int status;
+	if( (status = mkdir(targetDir.c_str(), 0644)) == 0  || errno == EEXIST ) {
+		cout << "mkdir status " << status << " exists " << (errno == EEXIST) << "\n";
 		
-		//determines what is the current file descriptor
-		if(fstat(currFD, &currStat) == 0) {
-			if( (currStat.st_mode & S_IFREG) ){
-				//is a regular file
-				handleFile(currFD, targetDir + "/" + filename);
-			} else if ( (currStat.st_mode * S_IFDIR) ) {
-				//is a directory
-				handleDir(currFD, currDir + "/" + filename, targetDir + "/" + filename);
+		//loops through file in directory
+		struct stat currStat;
+		struct dirent * file;
+		int currFD;
+		while((file = readdir(dir))) {
+			string filename {file->d_name};
+			if(filename.compare(".") == 0) 
+				continue;
+			if(filename.compare("..") == 0) 
+				continue;
+
+//			string targetString {targetDir + "/" + filename};
+
+			//opens file descriptor of the current file
+			if ( (currFD = openat(indir, file->d_name, O_RDONLY, 0)) < 0) {
+//			if ( (currFD = open(file->d_name, O_RDONLY, 0)) < 0) {
+				cerr << "Unable to open " << filename << " to read\n";
+				break;
 			}
-		} else { 
-			cerr << "Could not fstat " << filename << "\n";
+
+
+			//determines what is the current file descriptor
+			if(fstat(currFD, &currStat) == 0) {
+				if( (currStat.st_mode & S_IFREG) ){
+					//is a regular file
+					cout << targetDir + "/" + filename << "\n";
+					handleFile(currFD, targetDir + "/" + filename);
+				} else if ( (currStat.st_mode * S_IFDIR) ) {
+					//is a directory
+					cout << currFD << "\n";
+					cout << targetDir + "/" + filename << "\n";
+					handleDir(currFD, filename, targetDir);
+
+					//creates the directory at the destination and handles it
+
+
+				}
+			} else { 
+				cerr << "Could not fstat " << filename << "\n";
+			}
+
+
+			close(currFD);
 		}
-
-
-		close(currFD);
+	} else {
+		cerr << "Error in creating directory " << targetString << "\n";
+		cout << "mkdir status " << status << " exists " << (errno == EEXIST) << "\n";
 	}
+
+
 
 	closedir(dir);
 	return true;
@@ -150,7 +174,8 @@ bool backup::handleFile(int& infile) {
 	return handleFile(infile, destString);
 }
 
-bool backup::handleFile(int& infile, string& destString) {
+// @param: destString path including name of the file to be created at the destination
+bool backup::handleFile(int& infile, string destString) {
 	
 	//if file is not in the hashset, then write the file to the output directory
 	if(filesFound.find(inputString) == filesFound.end()) {

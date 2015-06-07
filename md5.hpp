@@ -6,7 +6,7 @@
 //#include <vector>
 #include <cstring>
 #include <iostream>
-#include <cstdint>
+//#include <cstdint>
 
 #define BLOCK 64
 #define BUFFER 1024
