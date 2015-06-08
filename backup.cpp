@@ -1,10 +1,11 @@
-#include <fstream>
+//#include <fstream>
+#include <cstdlib>
 //#include <cstdio>
 //#include <stdlib.h>
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/sendfile.h>
+//#include <sys/sendfile.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -20,8 +21,8 @@ void backup::run(char * inName, char * tarName, bool ow) {
 	inputString = string{inName};
 	targetString = string{tarName};
 
-//	path inPath (inName);
-//	path target (tarName);
+	//	path inPath (inName);
+	//	path target (tarName);
 
 	int inFD;
 	if ( (inFD = open(inName, O_RDONLY, 0)) < 0) {
@@ -43,20 +44,20 @@ void backup::run(char * inName, char * tarName, bool ow) {
 			return;
 		}
 	}
-	
 
-//	if( !exists(inPath) ) {
-//		cerr << "Input file " << inPath << " does not exist\n";
-//		return;
-//	} else if ( (inFD = open(inName, O_RDONLY,0)) < 0) {
-//		cerr << "Unable to open input file " << inPath << "\n";
-//		return;
-//	}
-//
-//	if( !is_directory(target) ) {
-//		cerr << target << " is not a directory\n";
-//		return;
-//	} 
+
+	//	if( !exists(inPath) ) {
+	//		cerr << "Input file " << inPath << " does not exist\n";
+	//		return;
+	//	} else if ( (inFD = open(inName, O_RDONLY,0)) < 0) {
+	//		cerr << "Unable to open input file " << inPath << "\n";
+	//		return;
+	//	}
+	//
+	//	if( !is_directory(target) ) {
+	//		cerr << target << " is not a directory\n";
+	//		return;
+	//	} 
 
 	//scans target directory and adds hashes of regular files to hashtable
 	scanDirectory(tarFD);
@@ -101,23 +102,21 @@ bool backup::handleDir(int& indir, string currDir, string targetDir ) {
 	int status;
 	if( (status = mkdir(targetDir.c_str(), 0644)) == 0  || errno == EEXIST ) {
 		cout << "mkdir status " << status << " exists " << (errno == EEXIST) << "\n";
-		
+
 		//loops through file in directory
 		struct stat currStat;
 		struct dirent * file;
 		int currFD;
 		while((file = readdir(dir))) {
 			string filename {file->d_name};
-			if(filename.compare(".") == 0) 
-				continue;
-			if(filename.compare("..") == 0) 
-				continue;
+			if(filename.compare(".") == 0) { continue; } 
+			if(filename.compare("..") == 0) { continue; }
 
-//			string targetString {targetDir + "/" + filename};
+			//			string targetString {targetDir + "/" + filename};
 
 			//opens file descriptor of the current file
-			if ( (currFD = openat(indir, file->d_name, O_RDONLY, 0)) < 0) {
-//			if ( (currFD = open(file->d_name, O_RDONLY, 0)) < 0) {
+			if ( (currFD = openat(indir, file->d_name, O_RDONLY, 0)) < 0 ) {
+				//			if ( (currFD = open(file->d_name, O_RDONLY, 0)) < 0) {
 				cerr << "Unable to open " << filename << " to read\n";
 				break;
 			}
@@ -134,10 +133,6 @@ bool backup::handleDir(int& indir, string currDir, string targetDir ) {
 					cout << currFD << "\n";
 					cout << targetDir + "/" + filename << "\n";
 					handleDir(currFD, filename, targetDir);
-
-					//creates the directory at the destination and handles it
-
-
 				}
 			} else { 
 				cerr << "Could not fstat " << filename << "\n";
@@ -176,7 +171,7 @@ bool backup::handleFile(int& infile) {
 
 // @param: destString path including name of the file to be created at the destination
 bool backup::handleFile(int& infile, string destString) {
-	
+
 	//if file is not in the hashset, then write the file to the output directory
 	if(filesFound.find(inputString) == filesFound.end()) {
 		cout << "file not found\n";
@@ -222,9 +217,9 @@ bool backup::copyFile(int& infile, string& destString) {
 	lseek(infile, 0, SEEK_SET);
 
 	int flags = O_WRONLY | O_CREAT | O_TRUNC;
-//	if(overwrite) {
-//		flags |= O_TRUNC;
-//	}
+	//	if(overwrite) {
+	//		flags |= O_TRUNC;
+	//	}
 	//opens and writes to destination file
 	int dest;
 	if( (dest = open(destString.c_str(), flags, 0644)) > 0) {
@@ -262,7 +257,7 @@ bool backup::copyFile(int& infile, string& destString) {
  * =====================================================================================
  */
 bool backup::scanDirectory(int tarFD) {
-	
+
 	DIR * dir;
 	if(NULL == (dir = fdopendir(tarFD))) {
 		cerr << "Cannot open directory " << targetString;
@@ -272,7 +267,7 @@ bool backup::scanDirectory(int tarFD) {
 
 	//closes the output directory
 	closedir(dir);
-	
+
 	return output;
 }
 
@@ -282,6 +277,8 @@ bool backup::scanDirectory(int tarFD) {
  *  Description:  Scans the target directory and adds hashes of all top level regular files to
  *  			  filesFound hashtable.
  *	
+ * 				  TODO: handle nested directories
+ *
  * 				  @param: dirname is the name of the target directory to be scanned.
  *
  * 				  @return: true if the directory was opened, false otherwise.
@@ -291,49 +288,68 @@ bool backup::scanDirectory(int tarFD) {
 bool backup::scanDirectory(DIR * dir) {
 
 
-	path dirPath (targetString);
-	
+	//	path dirPath (targetString);
+
 
 
 	//loop to add hashes of the files in the output directory to the hashset
+	struct stat currStat;
 	struct dirent * file;
+	int currFD;
 	while((file = readdir(dir))) {
 		string filename {file->d_name};
 
-//		if(strcmp(file->d_name, ".") == 0) 
+		//		if(strcmp(file->d_name, ".") == 0) 
 		if(filename.compare(".") == 0) 
 			continue;
 		if(filename.compare("..") == 0) 
-//		if(strcmp(file->d_name, "..") == 0) 
 			continue;
 
 		//path of the file found including the directory path
-//		string fullPath {dirPath + "/" + filename}
-		path filePath = dirPath / filename;
+		//		string fullPath {dirPath + "/" + filename}
+		//		path filePath = dirPath / filename;
 
 		//if file is a regular file then add it to the hash table
-		if( is_regular_file(filePath) ) {
+		//		if( is_regular_file(filePath) ) {
 
-			//checks if the file found can be opened
-			ifstream fileFound { filePath.string(), ifstream::in | ifstream::binary };
-			if(fileFound == NULL) {
-				cerr << "File " << filename << " could not be opened.\n";
-				//			fprintf(stderr, "File %s could not be opened\n", file->d_name);
-				continue;
-			}
-
-			//hashes the file found and inserts into the hashet
-			hasher.hash(fileFound);
-			filesFound[file->d_name] = hasher.toHex();
-
-			//closes the file
-			fileFound.close();
+		//checks if the file can be opened
+		if ( (currFD = open(file->d_name, O_RDONLY, 0)) < 0) {
+			cerr << "Unable to open " << filename << " to read\n";
+			continue;
 		}
+
+
+		//determines what is the current file descriptor
+		if(fstat(currFD, &currStat) == 0) {
+			if( (currStat.st_mode & S_IFREG) ){
+				//is a regular file
+
+				//hashes the file and inserts into hashtable
+				hasher.hash(currFD);
+				filesFound[filename] = hasher.toHex();
+
+
+
+				//					//checks if the file found can be opened
+				//					ifstream fileFound { filePath.string(), ifstream::in | ifstream::binary };
+				//					if(fileFound == NULL) {
+				//						cerr << "File " << filename << " could not be opened.\n";
+				//						//			fprintf(stderr, "File %s could not be opened\n", file->d_name);
+				//					} else {
+				//
+				//						//hashes the file found and inserts into the hashet
+				//						hasher.hash(fileFound);
+				//						filesFound[file->d_name] = hasher.toHex();
+				//
+				//						//closes the file
+				//						fileFound.close();
+				//					}
+			}
+		} else { cerr << "Could not fstat " << filename << "\n"; }
+
+		close(currFD);
 	}
 
-
-
-	
 	return true;
 }
 
@@ -343,7 +359,8 @@ int main(int argc, char * argv[]) {
 	if(argc != 3) {
 		//		cerr << "USAGE: " << argv[0] << " <Input File> <Output Directory> \n";
 		fprintf(stderr, "USAGE: %s <Input File> <Output Directory>\n", argv[0]);
-		exit(1);
+		return 1;
+//		exit(1);
 	}
 
 	char * filename = argv[1];
@@ -352,173 +369,173 @@ int main(int argc, char * argv[]) {
 	bool overwrite = true;
 	backup b;
 	b.run(filename, dirname, overwrite);
-	
 
-//	//checks input file and opens
-//	int fd;
-//	if((fd = open(filename, O_RDONLY,0)) < 0) {
-//		fprintf(stderr, "Unable to open input file\n");
-//		exit(1);
-//	}
-//
-//	//checks to see if output directory exists
-//	DIR * dir;
-//	if(NULL == (dir = opendir(dirname))) {
-//		fprintf(stderr, "Cannot open directory \"%s\"\n", dirname);
-//		exit(1);
-//	}
-//
-//
-//	string dirString {dirname};
-//	md5 hasher;
-////	unordered_set<string> filesFound;
-//	unordered_map<string, string> filesFound;
-//
-//	//loop to add hashes of the files in the output directory to the hashset
-//	struct dirent * file;
-//	while((file = readdir(dir))) {
-//		if(strcmp(file->d_name, ".") == 0) 
-//			continue;
-//		if(strcmp(file->d_name, "..") == 0) 
-//			continue;
-//
-//		//path of the file found including the directory path
-//		string pathString {dirString + "/" + file->d_name };
-//
-//		//checks if the file found can be opened
-//		ifstream fileFound { pathString, ifstream::in | ifstream::binary };
-//		if(fileFound == NULL) {
-//			//		cerr << "File " << filename << " could not be opened.\n";
-//			fprintf(stderr, "File %s could not be opened\n", file->d_name);
-//			continue;
-//		}
-//
-//		//hashes the file found and inserts into the hashet
-//		hasher.hash(fileFound);
-//		filesFound[file->d_name] = hasher.toHex();
-////		filesFound.insert(hasher.toHex());
-//		//		cout << "Hash of " << file->d_name << ": " << hasher.toHex() << "\n";
-//
-//		//closes the file
-//		fileFound.close();
-//	}
-//
-//	//closes the output directory
-//	closedir(dir);
-//
-//
-//
-//
-//
-//
-//
-//	struct stat statBuffer;
-//	if(fstat(fd, &statBuffer) == 0) {
-//
-//		if( statBuffer.st_mode & S_IFDIR ) {
-//			//input is a directory
-//			cout << "Directory\n";
-//
-//			path dirpath (dirname);
-//			path inpath (filename);
-//
-//
-//			//input name and target directory share a name
-//			if(inpath.compare(dirpath.filename()) == 0) {
-//				cout << "Same dir name\n";
-//			} else {
-//				//input and target directory do not share a name
-//				//copy directory
-//				path destpath = (dirpath / inpath);
-//			}
-//
-//			
-//
-//
-//		} else if ( statBuffer.st_mode & S_IFREG ) {
-//			//input is a file
-//			cout << "File\n";
-//
-//
-//
-//
-//			//if file is not in the hashset, then write the file to the output directory
-////			if(filesFound.count(hasher.toHex()) == 0) {
-//			if(filesFound.find(filename) == filesFound.end()) {
-//				cout << "file not found\n";
-//
-//				//resets error flag and moves pointer to start of the file
-//				lseek(fd, 0, SEEK_SET);
-//
-//				//string of path to destination file
-//				string pathString = dirString + "/" + filename;
-//				const char * pathC = pathString.c_str();
-//
-//				//opens and writes to destination file
-//				int dest;
-//				if( (dest = open(pathC, O_WRONLY | O_CREAT, 0644)) > 0) {
-//
-//					//uses Linux kernel to copy the file so NOT PORTABLE TO OTHER OS
-//					//TODO: possibly switch to boost filesystem copy_file, but potentially slower but portable?
-//					if(sendfile(dest, fd, 0, statBuffer.st_size) != statBuffer.st_size) {
-//						fprintf(stderr, "Did not copy %s correctly\n", pathC);
-//					}
-//
-//					close(dest);
-//				} else {
-//					fprintf(stderr, "Unable to open destination file %s\n", pathC);
-//				}
-//
-//			} else {
-//				cout << "file found\n";
-//				//file is found so check hash
-//				//hashes input file
-//				hasher.hash(fd);
-//
-//				//if hash of input file does not match the hash of the file in the target directory
-//				if(filesFound[filename] != hasher.toHex()) {
-//					cout << "hash does not match\n";
-//					
-//				}
-//			}
-//
-//
-//
-//		} else {
-//			cout << "Not file or directory\n";
-//		}
-//	}
-//
-//
-//
-//
-//
-//	close(fd); //closes input file
+
+	//	//checks input file and opens
+	//	int fd;
+	//	if((fd = open(filename, O_RDONLY,0)) < 0) {
+	//		fprintf(stderr, "Unable to open input file\n");
+	//		exit(1);
+	//	}
+	//
+	//	//checks to see if output directory exists
+	//	DIR * dir;
+	//	if(NULL == (dir = opendir(dirname))) {
+	//		fprintf(stderr, "Cannot open directory \"%s\"\n", dirname);
+	//		exit(1);
+	//	}
+	//
+	//
+	//	string dirString {dirname};
+	//	md5 hasher;
+	////	unordered_set<string> filesFound;
+	//	unordered_map<string, string> filesFound;
+	//
+	//	//loop to add hashes of the files in the output directory to the hashset
+	//	struct dirent * file;
+	//	while((file = readdir(dir))) {
+	//		if(strcmp(file->d_name, ".") == 0) 
+	//			continue;
+	//		if(strcmp(file->d_name, "..") == 0) 
+	//			continue;
+	//
+	//		//path of the file found including the directory path
+	//		string pathString {dirString + "/" + file->d_name };
+	//
+	//		//checks if the file found can be opened
+	//		ifstream fileFound { pathString, ifstream::in | ifstream::binary };
+	//		if(fileFound == NULL) {
+	//			//		cerr << "File " << filename << " could not be opened.\n";
+	//			fprintf(stderr, "File %s could not be opened\n", file->d_name);
+	//			continue;
+	//		}
+	//
+	//		//hashes the file found and inserts into the hashet
+	//		hasher.hash(fileFound);
+	//		filesFound[file->d_name] = hasher.toHex();
+	////		filesFound.insert(hasher.toHex());
+	//		//		cout << "Hash of " << file->d_name << ": " << hasher.toHex() << "\n";
+	//
+	//		//closes the file
+	//		fileFound.close();
+	//	}
+	//
+	//	//closes the output directory
+	//	closedir(dir);
+	//
+	//
+	//
+	//
+	//
+	//
+	//
+	//	struct stat statBuffer;
+	//	if(fstat(fd, &statBuffer) == 0) {
+	//
+	//		if( statBuffer.st_mode & S_IFDIR ) {
+	//			//input is a directory
+	//			cout << "Directory\n";
+	//
+	//			path dirpath (dirname);
+	//			path inpath (filename);
+	//
+	//
+	//			//input name and target directory share a name
+	//			if(inpath.compare(dirpath.filename()) == 0) {
+	//				cout << "Same dir name\n";
+	//			} else {
+	//				//input and target directory do not share a name
+	//				//copy directory
+	//				path destpath = (dirpath / inpath);
+	//			}
+	//
+	//			
+	//
+	//
+	//		} else if ( statBuffer.st_mode & S_IFREG ) {
+	//			//input is a file
+	//			cout << "File\n";
+	//
+	//
+	//
+	//
+	//			//if file is not in the hashset, then write the file to the output directory
+	////			if(filesFound.count(hasher.toHex()) == 0) {
+	//			if(filesFound.find(filename) == filesFound.end()) {
+	//				cout << "file not found\n";
+	//
+	//				//resets error flag and moves pointer to start of the file
+	//				lseek(fd, 0, SEEK_SET);
+	//
+	//				//string of path to destination file
+	//				string pathString = dirString + "/" + filename;
+	//				const char * pathC = pathString.c_str();
+	//
+	//				//opens and writes to destination file
+	//				int dest;
+	//				if( (dest = open(pathC, O_WRONLY | O_CREAT, 0644)) > 0) {
+	//
+	//					//uses Linux kernel to copy the file so NOT PORTABLE TO OTHER OS
+	//					//TODO: possibly switch to boost filesystem copy_file, but potentially slower but portable?
+	//					if(sendfile(dest, fd, 0, statBuffer.st_size) != statBuffer.st_size) {
+	//						fprintf(stderr, "Did not copy %s correctly\n", pathC);
+	//					}
+	//
+	//					close(dest);
+	//				} else {
+	//					fprintf(stderr, "Unable to open destination file %s\n", pathC);
+	//				}
+	//
+	//			} else {
+	//				cout << "file found\n";
+	//				//file is found so check hash
+	//				//hashes input file
+	//				hasher.hash(fd);
+	//
+	//				//if hash of input file does not match the hash of the file in the target directory
+	//				if(filesFound[filename] != hasher.toHex()) {
+	//					cout << "hash does not match\n";
+	//					
+	//				}
+	//			}
+	//
+	//
+	//
+	//		} else {
+	//			cout << "Not file or directory\n";
+	//		}
+	//	}
+	//
+	//
+	//
+	//
+	//
+	//	close(fd); //closes input file
 
 
 	return 0;
 }
 
 //uses boost::filesystem to recursively copy an entire directory
-bool recCopyDir(path inpath, path target) {
-	path destpath = (target / inpath);
-
-	if( !exists(destpath) ) {
-		copy_directory( inpath, target );
-	} else if( !is_directory(destpath) ) {
-		cerr << destpath << " is not a directory\n";
-		return false;
-	}
-
-
-	for(auto it = directory_iterator(inpath); it != directory_iterator(); ++it) {
-		
-
-	}
-
-	return true;
-
-}
+//		bool recCopyDir(path inpath, path target) {
+//			path destpath = (target / inpath);
+//
+//			if( !exists(destpath) ) {
+//				copy_directory( inpath, target );
+//			} else if( !is_directory(destpath) ) {
+//				cerr << destpath << " is not a directory\n";
+//				return false;
+//			}
+//
+//
+//			for(auto it = directory_iterator(inpath); it != directory_iterator(); ++it) {
+//
+//
+//			}
+//
+//			return true;
+//
+//		}
 
 //bool copyFile(path inpath, path target, md5 hasher) {
 //	path destpath = (target / inpath);

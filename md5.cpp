@@ -1,5 +1,6 @@
 #include "md5.hpp"
 #include <unistd.h>
+#include <cstdlib>
 
 constexpr unsigned int md5::S[];
 constexpr unsigned int md5::K[];

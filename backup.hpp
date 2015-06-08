@@ -2,9 +2,9 @@
 #define __BACKUP_HPP__
 
 #include <unordered_map>
-#include "boost/filesystem.hpp"
+//#include "boost/filesystem.hpp"
 #include "md5.hpp"
-using namespace boost::filesystem;
+//using namespace boost::filesystem;
 
 class backup {
 
@@ -32,7 +32,7 @@ class backup {
 		bool handleFile(int& infile, string destString);
 		bool copyFile(int& infile, string& destString);
 
-		bool recCopyDir(path inDir, path target);
+//		bool recCopyDir(path inDir, path target);
 	
 };
 

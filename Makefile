@@ -8,7 +8,7 @@ FLAGS = -O2 -g -Wall
 CFLAGS = $(FLAGS)
 CXXFLAGS = $(FLAGS) -std=c++11
 
-LDLIBS = -lboost_system -lboost_filesystem
+#LDLIBS = -lboost_system -lboost_filesystem
 
 .PHONY: default
 default: $(EXE)
@@ -19,7 +19,7 @@ $(OBJ): backup.cpp backup.hpp md5.cpp md5.hpp
 
 .PHONY: clean
 clean:
-	rm -f $(OBJ) $(EXE) 
+	rm -f $(OBJ) $(EXE) *.exe
 
 .PHONY: all
 all: clean default 
