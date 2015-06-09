@@ -60,7 +60,7 @@ void backup::run(char * inName, char * tarName, bool ow) {
 	//	} 
 
 	//scans target directory and adds hashes of regular files to hashtable
-	scanDirectory(tarFD);
+	scanDirectory(tarFD, tarName);
 
 
 	struct stat statBuffer;
@@ -88,13 +88,20 @@ void backup::run(char * inName, char * tarName, bool ow) {
 
 	close(inFD);
 
+	for( auto it = filesFound.begin(); it != filesFound.end(); ++it ) {
+		cout << it->first << " " << it->second << "\n";
+	}
+
 }
 
 bool backup::handleDir(int& indir, string currDir, string targetDir ) {
+	bool output = false;
+
+	//opens the input directory
 	DIR * dir;
 	if(NULL == (dir = fdopendir(indir))) {
 		cerr << "Cannot open directory " << targetString;
-		return false;
+		return output;
 	}	
 
 	targetDir += "/" + currDir;
@@ -102,6 +109,15 @@ bool backup::handleDir(int& indir, string currDir, string targetDir ) {
 	int status;
 	if( (status = mkdir(targetDir.c_str(), 0644)) == 0  || errno == EEXIST ) {
 		cout << "mkdir status " << status << " exists " << (errno == EEXIST) << "\n";
+
+		if(errno == EEXIST) {
+			int tarFD;
+			if( (tarFD = open(targetDir.c_str(), O_RDONLY, 0)) < 0 ) {
+				cerr << "Unable to open " << targetDir << " to read\n";
+			} else {
+				scanDirectory(tarFD, targetDir);
+			}
+		}
 
 		//loops through file in directory
 		struct stat currStat;
@@ -140,16 +156,15 @@ bool backup::handleDir(int& indir, string currDir, string targetDir ) {
 
 
 			close(currFD);
+			output = true;
 		}
 	} else {
 		cerr << "Error in creating directory " << targetString << "\n";
 		cout << "mkdir status " << status << " exists " << (errno == EEXIST) << "\n";
 	}
 
-
-
 	closedir(dir);
-	return true;
+	return output;
 }
 
 /* 
@@ -256,14 +271,14 @@ bool backup::copyFile(int& infile, string& destString) {
  * 				  @return: true if directory was opened, false otherwise
  * =====================================================================================
  */
-bool backup::scanDirectory(int tarFD) {
+bool backup::scanDirectory(int tarFD, string tarString) {
 
 	DIR * dir;
 	if(NULL == (dir = fdopendir(tarFD))) {
-		cerr << "Cannot open directory " << targetString;
+		cerr << "Cannot open directory " << tarString;
 		return false;
 	}
-	bool output = scanDirectory(dir);
+	bool output = scanDirectory(dir, tarString);
 
 	//closes the output directory
 	closedir(dir);
@@ -285,7 +300,16 @@ bool backup::scanDirectory(int tarFD) {
  * =====================================================================================
  */
 //bool backup::scanDirectory(char * dirname) {
-bool backup::scanDirectory(DIR * dir) {
+bool backup::scanDirectory(DIR * dir, string& tarString) {
+	bool output = false;
+
+	int dirFD;
+	if( (dirFD = dirfd(dir)) < 0) {
+		perror("scanDirectory: Cannot get file descriptor from DIR *");
+		return output;
+	}
+
+
 
 
 	//	path dirPath (targetString);
@@ -313,8 +337,9 @@ bool backup::scanDirectory(DIR * dir) {
 		//		if( is_regular_file(filePath) ) {
 
 		//checks if the file can be opened
-		if ( (currFD = open(file->d_name, O_RDONLY, 0)) < 0) {
-			cerr << "Unable to open " << filename << " to read\n";
+		if ( (currFD = openat(dirFD, file->d_name, O_RDONLY, 0)) < 0) {
+			cerr << "Unable to open " << file->d_name << " to read\n";
+			perror("scanDirectory");
 			continue;
 		}
 
@@ -326,7 +351,7 @@ bool backup::scanDirectory(DIR * dir) {
 
 				//hashes the file and inserts into hashtable
 				hasher.hash(currFD);
-				filesFound[filename] = hasher.toHex();
+				filesFound[tarString + "/" + filename] = hasher.toHex();
 
 
 
@@ -348,9 +373,10 @@ bool backup::scanDirectory(DIR * dir) {
 		} else { cerr << "Could not fstat " << filename << "\n"; }
 
 		close(currFD);
+		output = true;
 	}
 
-	return true;
+	return output;
 }
 
 
@@ -512,6 +538,7 @@ int main(int argc, char * argv[]) {
 	//
 	//	close(fd); //closes input file
 
+	
 
 	return 0;
 }

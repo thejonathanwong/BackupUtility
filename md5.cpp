@@ -184,11 +184,14 @@ void md5::readFile(int infile) {
 	unsigned long long totalBytes = 0;
 	unsigned int bytesRead = 0;
 
+	bytesRead = read(infile, chunk, BUFFER);
+	
 //	while (infile) {
 //		infile.read(chunk, BUFFER);
 //	while( !feof(infile) ) {
 //		bytesRead = fread(chunk, 1, BUFFER, infile);
-	while((bytesRead = read(infile, chunk, BUFFER)) > 0) {
+//	while((bytesRead = read(infile, chunk, BUFFER)) >= 0) {
+	do {
 
 //		bytesRead = infile.gcount();
 		totalBytes += bytesRead;
@@ -232,7 +235,7 @@ void md5::readFile(int infile) {
 
 			}
 		}
-	}
+	} while((bytesRead = read(infile, chunk, BUFFER)) > 0);
 	
 }
 

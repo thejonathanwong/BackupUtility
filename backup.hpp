@@ -23,8 +23,8 @@ class backup {
 		md5 hasher;
 		unordered_map<string, string> filesFound;
 
-		bool scanDirectory(int tarFD);
-		bool scanDirectory(DIR * dir);
+		bool scanDirectory(int tarFD, string tarString);
+		bool scanDirectory(DIR * dir, string& tarString);
 
 		bool handleDir(int& indir, string currDir, string targetDir);
 
