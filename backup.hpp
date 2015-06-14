@@ -3,6 +3,7 @@
 
 #include <unordered_map>
 #include <queue>
+#include <utility>
 //#include "boost/filesystem.hpp"
 #include "md5.hpp"
 //using namespace boost::filesystem;
@@ -14,17 +15,21 @@ class backup {
 
 
 		void run(char * inName, char * tarName, bool ow);
+		void run2(char * inName, char * tarName, bool ow);
 
 	private:
+
+		typedef pair<string, string> pathPair;
 
 		//members
 		string inputString;
 		string targetString;
+
 		bool overwrite;
 		md5 hasher;
 
 		unordered_map<string, string> filesFound;
-		queue<string> dirsFound;
+		queue< pathPair > pathQueue;
 
 		bool scanDirectory(int tarFD, string tarString);
 		bool scanDirectory(DIR * dir, string& tarString);
@@ -39,7 +44,7 @@ class backup {
 //		bool copyFile(int& infile, string& inputName, int& target);
 		bool copyFile(int& infile, string& targetPath);
 
-		bool handleFD(int& input, string inputName, string targetPath);
+		bool handleFD(int& input, string inputPath, string targetPath);
 //		bool recCopyDir(path inDir, path target);
 	
 };

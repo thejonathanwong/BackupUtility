@@ -14,9 +14,71 @@
 #include "backup.hpp"
 //#include "md5.hpp"
 
+void backup::run( char * inName, char * tarName, bool ow) {
+	overwrite = ow;
+	inputString = string{inName};
+	targetString = string{tarName};
+
+	int tarFD;
+	if ( (tarFD = open(tarName, O_RDONLY, 0)) < 0) {
+		cerr << "Unable to open target directory " << targetString << "\n";
+		return;
+	}
+
+	struct stat tarStat;
+	if(fstat(tarFD, &tarStat) == 0) {
+		if( !(tarStat.st_mode & S_IFDIR) ){
+			// target is not a directory
+			cerr << targetString << " is not a directory\n";
+			return;
+		}
+	}
+
+	//removes all '/' characters from end of inputs
+	while(inputString.back() == '/') { inputString.pop_back(); }
+	while(targetString.back() == '/') { targetString.pop_back(); }
+
+//	string filename = inputString;
+//	size_t pos;
+//	if( (pos = inputString.rfind("/")) != string::npos ) {
+//		filename = inputString.substr(pos+1, string::npos);
+//	}
+
+	//scans target directory and adds hashes of regular files to hashtable
+	scanDirectory(tarFD, targetString);
+
+	pathQueue.push( pathPair(inputString, targetString) );
+
+	string filename;
+	size_t pos;
+
+	while( !pathQueue.empty() ) {
+		pathPair pp = pathQueue.front();
+		pathQueue.pop();
+
+		string currPath = pp.first;
+		string targetPath = pp.second;
+
+		filename = currPath;
+		if( (pos = currPath.rfind("/")) != string::npos ) {
+			filename = currPath.substr(pos+1, string::npos);
+		}
+
+		int currFD;
+		if( (currFD = open(currPath.c_str(), O_RDONLY, 0)) < 0) {
+			cerr << "Unable to open input " << currPath << "\n";
+			continue;
+		}
+
+		handleFD(currFD, currPath, targetPath + "/" + filename);
+		
+		close(currFD);
+	}
+	
+}
 
 //void backup(char * input, char * output);
-void backup::run(char * inName, char * tarName, bool ow) {
+void backup::run2(char * inName, char * tarName, bool ow) {
 	overwrite = ow;
 	inputString = string{inName};
 	targetString = string{tarName};
@@ -66,13 +128,15 @@ void backup::run(char * inName, char * tarName, bool ow) {
 	}
 
 	string filename = inputString;
-	auto pos = inputString.rfind("/") + 1;
-	if( pos != string::npos ) {
-		filename = inputString.substr(pos, string::npos);
+	size_t pos;
+	if( (pos = inputString.rfind("/")) != string::npos ) {
+		filename = inputString.substr(pos+1, string::npos);
 	}
 
 	//scans target directory and adds hashes of regular files to hashtable
 	scanDirectory(tarFD, targetString);
+
+
 	handleFD(inFD, inputString, targetString + "/" + filename);
 
 
@@ -125,7 +189,7 @@ bool backup::handleFD(int& input, string inputPath, string targetPath){
 		} else if ( inputStat.st_mode & S_IFDIR ) {
 			//input is a directory
 //			dirsFound.push(inputPath);
-			success = handleDir(input, inputPath, targetPath);
+//			success = handleDir(input, inputPath, targetPath);
 		} else {
 			//input is other
 		}
@@ -298,14 +362,14 @@ bool backup::handleFile(int& input, string& targetPath) {
 
 	//if file is not in the hashset, then write the file to the output directory
 	if(filesFound.find(targetPath) == filesFound.end()) {
-		cout << "file not found\n";
+		cout << "handleFile file not found\n";
 
 
 		success = copyFile( input, targetPath );
 
 
 	} else if(overwrite){
-		cout << "file found\n";
+		cout << "handleFile file found\n";
 		//file is found so check hash
 		//hashes input file
 		hasher.hash(input);
