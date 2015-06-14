@@ -58,158 +58,265 @@ void backup::run(char * inName, char * tarName, bool ow) {
 	//		cerr << target << " is not a directory\n";
 	//		return;
 	//	} 
-
-	//scans target directory and adds hashes of regular files to hashtable
-	scanDirectory(tarFD, tarName);
-
-
-	struct stat statBuffer;
-	if(fstat(inFD, &statBuffer) == 0) {
-
-		if( statBuffer.st_mode & S_IFREG ) {
-			//input is a regular file
-
-			if( !handleFile(inFD) ) {
-				cerr << "Error copying " << inputString << " to " << targetString << "\n";
-			}
-
-		} else if ( statBuffer.st_mode & S_IFDIR ) {
-			//input is a directory
-			cout << "Input is a directory\n";
-			handleDir(inFD, inputString, targetString);
-
-		} else {
-			//input is symlink or other
-		}
-
-	} else {
-		cerr << "Error in fstat of input\n";
+	while(inputString.back() == '/') {
+			inputString.pop_back();
+	}
+	while(targetString.back() == '/') {
+		targetString.pop_back();
 	}
 
+	string filename = inputString;
+	auto pos = inputString.rfind("/") + 1;
+	if( pos != string::npos ) {
+		filename = inputString.substr(pos, string::npos);
+	}
+
+	//scans target directory and adds hashes of regular files to hashtable
+	scanDirectory(tarFD, targetString);
+	handleFD(inFD, inputString, targetString + "/" + filename);
+
+
+//	struct stat statBuffer;
+//	if(fstat(inFD, &statBuffer) == 0) {
+//
+//		if( statBuffer.st_mode & S_IFREG ) {
+//			//input is a regular file
+//
+//			if( !handleFile(inFD) ) {
+//				cerr << "Error copying " << inputString << " to " << targetString << "\n";
+//			}
+//
+//		} else if ( statBuffer.st_mode & S_IFDIR ) {
+//			//input is a directory
+//			cout << "Input is a directory\n";
+//			handleDir(inFD, inputString, targetString);
+//
+//		} else {
+//			//input is symlink or other
+//		}
+//
+//	} else {
+//		cerr << "Error in fstat of input\n";
+//	}
+
+//	close(tarFD);
 	close(inFD);
 
 	for( auto it = filesFound.begin(); it != filesFound.end(); ++it ) {
 		cout << it->first << " " << it->second << "\n";
 	}
+	cout << filesFound.size() << "\n";
 
 }
 
-bool backup::handleDir(int& indir, string currDir, string targetDir ) {
-	bool output = false;
+bool backup::handleFD(int& input, string inputPath, string targetPath){
+	bool success = false;
+	
+
+	
+//	cout << inputName << " " << filename << " " << targetPath << "\n";
+
+	struct stat inputStat;
+	if( fstat(input, &inputStat) == 0 ) {
+
+		if( inputStat.st_mode & S_IFREG ) {
+			//input is regular file
+			success = handleFile(input, targetPath);
+		} else if ( inputStat.st_mode & S_IFDIR ) {
+			//input is a directory
+//			dirsFound.push(inputPath);
+			success = handleDir(input, inputPath, targetPath);
+		} else {
+			//input is other
+		}
+		
+	}
+
+	return success;
+}
+
+bool backup::handleDir(int& input, string& inputPath, string& targetPath) {
+//bool backup::handleDir(string inputPath, string targetPath) {
+	bool success = true;
 
 	//opens the input directory
 	DIR * dir;
-	if(NULL == (dir = fdopendir(indir))) {
-		cerr << "Cannot open directory " << targetString;
-		return output;
+	if(NULL == (dir = fdopendir(input))) {
+		cerr << "Cannot open directory " << inputPath;
+		return false;
 	}	
 
-	targetDir += "/" + currDir;
+//	DIR * dir;
+//	if(NULL == (dir = opendir(inputPath.c_str()))) {
+//		cerr << "Cannot open directory " << inputPath;
+//		return false;
+//	}
 
 	int status;
-	if( (status = mkdir(targetDir.c_str(), 0644)) == 0  || errno == EEXIST ) {
-		cout << "mkdir status " << status << " exists " << (errno == EEXIST) << "\n";
-
+	if( (status = mkdir(targetPath.c_str(), 0644)) == 0  || errno == EEXIST ) {
 		if(errno == EEXIST) {
-			int tarFD;
-			if( (tarFD = open(targetDir.c_str(), O_RDONLY, 0)) < 0 ) {
-				cerr << "Unable to open " << targetDir << " to read\n";
+			int targetFD;
+			if( (targetFD = open(targetPath.c_str(), O_RDONLY, 0)) < 0 ) {
+				cerr << "Unable to open " << targetPath << " to read\n";
 			} else {
-				scanDirectory(tarFD, targetDir);
+				scanDirectory(targetFD, targetPath);
 			}
 		}
 
-		//loops through file in directory
-		struct stat currStat;
-		struct dirent * file;
 		int currFD;
-		while((file = readdir(dir))) {
-			string filename {file->d_name};
-			if(filename.compare(".") == 0) { continue; } 
-			if(filename.compare("..") == 0) { continue; }
+		struct dirent * curr;
+		while( (curr = readdir(dir)) ) {
+			string currName {curr->d_name};
+			if(currName.compare(".") == 0) { continue; } 
+			if(currName.compare("..") == 0) { continue; }
 
-			//			string targetString {targetDir + "/" + filename};
+			string childPath { inputPath + "/" + currName };
+			string newTarget { targetPath + "/" + currName };
 
 			//opens file descriptor of the current file
-			if ( (currFD = openat(indir, file->d_name, O_RDONLY, 0)) < 0 ) {
-				//			if ( (currFD = open(file->d_name, O_RDONLY, 0)) < 0) {
-				cerr << "Unable to open " << filename << " to read\n";
-				break;
+//			if ( (currFD = openat(input, curr->d_name, O_RDONLY, 0)) < 0 ) {
+			if ( (currFD = open(childPath.c_str(), O_RDONLY, 0)) < 0) {
+				cerr << "Unable to open " << childPath << " to read\n";
+				continue;
 			}
 
-
-			//determines what is the current file descriptor
-			if(fstat(currFD, &currStat) == 0) {
-				if( (currStat.st_mode & S_IFREG) ){
-					//is a regular file
-					cout << targetDir + "/" + filename << "\n";
-					handleFile(currFD, targetDir + "/" + filename);
-				} else if ( (currStat.st_mode * S_IFDIR) ) {
-					//is a directory
-					cout << currFD << "\n";
-					cout << targetDir + "/" + filename << "\n";
-					handleDir(currFD, filename, targetDir);
-				}
-			} else { 
-				cerr << "Could not fstat " << filename << "\n";
+			if( handleFD(currFD, childPath, newTarget) == false ) {
+				success = false;
 			}
 
-
+			//close file descriptor of curr
 			close(currFD);
-			output = true;
 		}
-	} else {
-		cerr << "Error in creating directory " << targetString << "\n";
-		cout << "mkdir status " << status << " exists " << (errno == EEXIST) << "\n";
+
 	}
 
+	//closes input directory stream
 	closedir(dir);
-	return output;
+
+	return success;
 }
+
+//
+//bool backup::handleDir(int& indir, string currDir, string targetDir ) {
+//	bool output = false;
+//
+//	//opens the input directory
+//	DIR * dir;
+//	if(NULL == (dir = fdopendir(indir))) {
+//		cerr << "Cannot open directory " << targetString;
+//		return output;
+//	}	
+//
+//	targetDir += "/" + currDir;
+//
+//	int status;
+//	if( (status = mkdir(targetDir.c_str(), 0644)) == 0  || errno == EEXIST ) {
+//		cout << "mkdir status " << status << " exists " << (errno == EEXIST) << "\n";
+//
+//		if(errno == EEXIST) {
+//			int tarFD;
+//			if( (tarFD = open(targetDir.c_str(), O_RDONLY, 0)) < 0 ) {
+//				cerr << "Unable to open " << targetDir << " to read\n";
+//			} else {
+//				scanDirectory(tarFD, targetDir);
+//			}
+//		}
+//
+//		//loops through file in directory
+//		struct stat currStat;
+//		struct dirent * file;
+//		int currFD;
+//		while((file = readdir(dir))) {
+//			string filename {file->d_name};
+//			if(filename.compare(".") == 0) { continue; } 
+//			if(filename.compare("..") == 0) { continue; }
+//
+//			//			string targetString {targetDir + "/" + filename};
+//
+//			//opens file descriptor of the current file
+//			if ( (currFD = openat(indir, file->d_name, O_RDONLY, 0)) < 0 ) {
+//				//			if ( (currFD = open(file->d_name, O_RDONLY, 0)) < 0) {
+//				cerr << "Unable to open " << filename << " to read\n";
+//				break;
+//			}
+//
+//
+//			//determines what is the current file descriptor
+//			if(fstat(currFD, &currStat) == 0) {
+//				if( (currStat.st_mode & S_IFREG) ){
+//					//is a regular file
+//					cout << targetDir + "/" + filename << "\n";
+//					handleFile(currFD, targetDir + "/" + filename);
+//				} else if ( (currStat.st_mode * S_IFDIR) ) {
+//					//is a directory
+//					cout << currFD << "\n";
+//					cout << targetDir + "/" + filename << "\n";
+//					handleDir(currFD, filename, targetDir);
+//				}
+//			} else { 
+//				cerr << "Could not fstat " << filename << "\n";
+//			}
+//
+//
+//			close(currFD);
+//			output = true;
+//		}
+//	} else {
+//		cerr << "Error in creating directory " << targetString << "\n";
+//		cout << "mkdir status " << status << " exists " << (errno == EEXIST) << "\n";
+//	}
+//
+//	closedir(dir);
+//	return output;
+//}
 
 /* 
  * ===  FUNCTION  ======================================================================
  *         Name:  handleFile
- *  Description:  Manages what to do with backing up a single file.
+ *  Description:  Manages what to do with backing up a single file. If the file is not in the
+ *  			  target directory, it is copied. If the file is already in the target directory, but the
+ *  			  overwrite boolean is true, then the file is overwritten. Otherwise, nothing is done.
  * 
  * 				  @param: infile input file descriptor of the file to be backed up
  * 			
  * 				  @return: true if file was handled, false if error in copying
  * =====================================================================================
  */
-bool backup::handleFile(int& infile) {
-	//string of path to destination file
-	string destString = targetString + "/" + inputString;
-
-	return handleFile(infile, destString);
-}
+//bool backup::handleFile(int& infile) {
+//	//string of path to destination file
+//	string destString = targetString + "/" + inputString;
+//
+//	return handleFile(infile, destString);
+//}
 
 // @param: destString path including name of the file to be created at the destination
-bool backup::handleFile(int& infile, string destString) {
+//bool backup::handleFile(int& infile, string destString) {
+bool backup::handleFile(int& input, string& targetPath) {
+	bool success = false;
+
+//	cerr << "inputName = " << inputName << " targetPath = " << targetPath << "\n";
 
 	//if file is not in the hashset, then write the file to the output directory
-	if(filesFound.find(inputString) == filesFound.end()) {
+	if(filesFound.find(targetPath) == filesFound.end()) {
 		cout << "file not found\n";
 
 
-
-
-		return copyFile(infile, destString);
+		success = copyFile( input, targetPath );
 
 
 	} else if(overwrite){
 		cout << "file found\n";
 		//file is found so check hash
 		//hashes input file
-		hasher.hash(infile);
+		hasher.hash(input);
 
 		//if hash of input file does not match the hash of the file in the target directory
-		if(filesFound[inputString] != hasher.toHex()) {
+		if(filesFound[targetPath] != hasher.toHex()) {
 			cout << "hash does not match\n";
-			return copyFile(infile, destString);
+			success = copyFile( input, targetPath );
 		}
 	}	
-	return true;
+	return success;
 }
 
 
@@ -227,9 +334,14 @@ bool backup::handleFile(int& infile, string destString) {
  * 				  @return: true if destination was opened, false otherwise
  * =====================================================================================
  */
-bool backup::copyFile(int& infile, string& destString) {
+//bool backup::copyFile(int& infile, string& destString) {
+//bool backup::copyFile(int& input, string& inputName, int& target) {
+bool backup::copyFile(int& input, string& targetPath) {
+
+
+
 	//resets error flag and moves pointer to start of the file
-	lseek(infile, 0, SEEK_SET);
+	lseek(input, 0, SEEK_SET);
 
 	int flags = O_WRONLY | O_CREAT | O_TRUNC;
 	//	if(overwrite) {
@@ -237,11 +349,12 @@ bool backup::copyFile(int& infile, string& destString) {
 	//	}
 	//opens and writes to destination file
 	int dest;
-	if( (dest = open(destString.c_str(), flags, 0644)) > 0) {
+//	if( (dest = openat(target, inputName.c_str(), flags, 0644)) > 0) {
+	if( (dest = open(targetPath.c_str(), flags, 0644)) > 0) {
 
 		char buffer[BUFFER];
 		size_t size;
-		while( (size = read(infile, buffer, BUFFER)) > 0 ) {
+		while( (size = read(input, buffer, BUFFER)) > 0 ) {
 			write(dest, buffer, size);
 		}
 
@@ -254,7 +367,8 @@ bool backup::copyFile(int& infile, string& destString) {
 		//
 		close(dest);
 	} else {
-		cerr << "Unable to open destination file " << destString << "\n";
+		cerr << "Unable to copy file to " << targetPath << " " << "\n";
+		perror("copyFile");
 		return false;
 	}
 	return true;
@@ -300,15 +414,16 @@ bool backup::scanDirectory(int tarFD, string tarString) {
  * =====================================================================================
  */
 //bool backup::scanDirectory(char * dirname) {
-bool backup::scanDirectory(DIR * dir, string& tarString) {
+bool backup::scanDirectory(DIR * dir, string& targetDir) {
 	bool output = false;
+	cout << "scanDirectory tarString = " << targetDir << "\n";
 
-	int dirFD;
-	if( (dirFD = dirfd(dir)) < 0) {
-		perror("scanDirectory: Cannot get file descriptor from DIR *");
-		return output;
-	}
-
+//	int dirFD;
+//	if( (dirFD = dirfd(dir)) < 0) {
+//		perror("scanDirectory: Cannot get file descriptor from DIR *");
+//		return output;
+//	}
+//
 
 
 
@@ -336,9 +451,12 @@ bool backup::scanDirectory(DIR * dir, string& tarString) {
 		//if file is a regular file then add it to the hash table
 		//		if( is_regular_file(filePath) ) {
 
+		string fullPath {targetDir + "/" + filename};
+
 		//checks if the file can be opened
-		if ( (currFD = openat(dirFD, file->d_name, O_RDONLY, 0)) < 0) {
-			cerr << "Unable to open " << file->d_name << " to read\n";
+//		if ( (currFD = openat(dirFD, file->d_name, O_RDONLY, 0)) < 0) {
+		if ( (currFD = open(fullPath.c_str(), O_RDONLY, 0)) < 0) {
+			cerr << "Unable to open " << fullPath << " to read\n";
 			perror("scanDirectory");
 			continue;
 		}
@@ -351,7 +469,7 @@ bool backup::scanDirectory(DIR * dir, string& tarString) {
 
 				//hashes the file and inserts into hashtable
 				hasher.hash(currFD);
-				filesFound[tarString + "/" + filename] = hasher.toHex();
+				filesFound[fullPath] = hasher.toHex();
 
 
 
