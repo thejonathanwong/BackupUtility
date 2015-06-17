@@ -44,7 +44,7 @@ class backup {
 //		bool copyFile(int& infile, string& inputName, int& target);
 		bool copyFile(int& infile, string& targetPath);
 
-		bool handleFD(int& input, string inputPath, string targetPath);
+		bool handleFD(int& input, string inputName, string targetPath);
 //		bool recCopyDir(path inDir, path target);
 	
 };
