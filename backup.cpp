@@ -14,6 +14,12 @@
 #include "backup.hpp"
 //#include "md5.hpp"
 
+/*
+ * TODO: Possible hashing of dirs for scanDirectory to conditional mkdir in handleDir
+ * TODO: Error handling
+ * TODO: Flag for overwrite
+ */
+
 void backup::run( char * inName, char * tarName, bool ow) {
 	overwrite = ow;
 	inputString = string{inName};
